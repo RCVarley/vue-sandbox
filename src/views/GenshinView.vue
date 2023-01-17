@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick, type ComponentPublicInstance } from 'vue';
 import { useCodesStore } from '@/stores/codes';
 
 interface LineOfCode {
@@ -11,6 +11,21 @@ const store = useCodesStore();
 
 const base = ref(3);
 const codes = ref(new Array<LineOfCode>());
+const inputs = ref(new Map<string, Element | ComponentPublicInstance | null>());
+
+function focusElement(key: string) {
+  nextTick(() => {
+    const el = inputs.value.get(key) as HTMLInputElement;
+    el.focus();
+  });
+}
+
+function blurElement(key: string) {
+  nextTick(() => {
+    const el = inputs.value.get(key) as HTMLInputElement;
+    el.blur();
+  });
+}
 
 function addLine() {
   codes.value.push({
@@ -19,21 +34,38 @@ function addLine() {
   });
 }
 
-function addChunk(lineIndex: number) {
-  codes.value[lineIndex]?.chunks.push(['', '', '']);
+function addChunk(lineIndex: number, goto = true) {
+  const chunks = codes.value[lineIndex].chunks;
+  chunks.push(['', '', '']);
+
+  if (goto) {
+    focusElement(`${lineIndex}:${chunks.length - 1}:0`);
+  }
+}
+
+function clear() {
+  codes.value = [];
+  nextTick(() => {
+    inputs.value.clear();
+  });
+  nextTick(() => {
+    addLine();
+  });
 }
 
 function reset() {
   codes.value = [];
-  const sc = store.getSourceCodes.value;
-  for (const line in sc) {
-    const chunks: (number | string)[][] = sc.get(line)!;
-
+  for (const line of store.getSourceCodes) {
     codes.value.push({
-      name: line,
-      chunks,
+      name: line[0],
+      chunks: [...line[1]],
     });
   }
+}
+
+function onChangeName(lineIndex: number, event: Event) {
+  const { value } = event.target as HTMLInputElement;
+  codes.value[lineIndex].name = value;
 }
 
 function onChangeCharacter(
@@ -43,7 +75,26 @@ function onChangeCharacter(
   event: Event
 ) {
   const { value } = event.target as HTMLInputElement;
-  codes.value[lineIndex].chunks[chunkIndex][charIndex] = value;
+  const chunks = codes.value[lineIndex].chunks;
+  chunks[chunkIndex][charIndex] = value;
+
+  if (!value) {
+    return;
+  }
+
+  if (charIndex < 2) {
+    focusElement(`${lineIndex}:${chunkIndex}:${charIndex + 1}`);
+  } else if (chunkIndex < chunks.length - 1) {
+    focusElement(`${lineIndex}:${chunkIndex + 1}:0`);
+  }
+}
+
+function onEnter(lineIndex: number) {
+  if (lineIndex === codes.value.length - 1) {
+    addLine();
+  }
+
+  focusElement(`${lineIndex + 1}`);
 }
 
 onMounted(() => {
@@ -59,13 +110,22 @@ onMounted(() => {
     </div>
     <div class="collection">
       <button @click="reset">Reset</button>
+      <button @click="clear">Clear</button>
+      <button @click="addLine">Add Line</button>
     </div>
     <div
       v-for="(line, lineIndex) in codes"
       :key="lineIndex"
       class="collection line-of-code"
+      @keyup.enter="onEnter(lineIndex)"
     >
-      <input v-model="line.name" type="text" placeholder="Name" />
+      <input
+        :value="line.name"
+        :ref="(el) => inputs.set(`${lineIndex}`, el)"
+        type="text"
+        placeholder="Name"
+        @input="onChangeName(lineIndex, $event)"
+      />
       <span
         v-for="(chunk, chunkIndex) in line.chunks"
         :key="chunkIndex"
@@ -75,15 +135,21 @@ onMounted(() => {
           v-for="(character, charIndex) in chunk"
           :key="charIndex"
           :value="character"
+          :ref="
+            (el) => {
+              inputs.set(`${lineIndex}:${chunkIndex}:${charIndex}`, el);
+            }
+          "
           type="text"
           placeholder="."
-          @change="onChangeCharacter(lineIndex, chunkIndex, charIndex, $event)"
+          @input="onChangeCharacter(lineIndex, chunkIndex, charIndex, $event)"
         />
       </span>
-      <span class="collection line-of-code__chunk ghost">
-        <input type="text" placeholder="." v-on:focusin="addChunk(lineIndex)" />
-        <input type="text" placeholder="." v-on:focusin="addChunk(lineIndex)" />
-        <input type="text" placeholder="." v-on:focusin="addChunk(lineIndex)" />
+      <span
+        class="collection line-of-code__chunk line-of-code__chunk--ghost"
+        @focusin="addChunk(lineIndex)"
+      >
+        <input v-for="(_, i) in 3" :key="i" type="text" placeholder="." />
       </span>
     </div>
   </main>
@@ -99,7 +165,7 @@ onMounted(() => {
   margin-inline-start: 0;
 }
 
-.line-of-code > .line-of-code__chunk.ghost * {
+.line-of-code__chunk--ghost {
   opacity: 50%;
 }
 
