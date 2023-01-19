@@ -1,29 +1,27 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, type ComponentPublicInstance } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useCodesStore } from '@/stores/codes';
+import cloneDeep from 'lodash.clonedeep';
 
 interface LineOfCode {
   name: string;
   chunks: (number | string)[][];
 }
 
+interface HTMLInputElementEvent extends Omit<Event, 'target'> {
+  target: HTMLInputElement;
+}
+
 const store = useCodesStore();
 
 const base = ref(3);
 const codes = ref(new Array<LineOfCode>());
-const inputs = ref(new Map<string, Element | ComponentPublicInstance | null>());
+const inputs = ref(new Map<string, HTMLInputElement>());
 
 function focusElement(key: string) {
   nextTick(() => {
-    const el = inputs.value.get(key) as HTMLInputElement;
+    const el = inputs.value.get(key)!;
     el.focus();
-  });
-}
-
-function blurElement(key: string) {
-  nextTick(() => {
-    const el = inputs.value.get(key) as HTMLInputElement;
-    el.blur();
   });
 }
 
@@ -55,16 +53,16 @@ function clear() {
 
 function reset() {
   codes.value = [];
-  for (const line of store.getSourceCodes) {
+  for (const key of Object.keys(store.getSourceCodes)) {
     codes.value.push({
-      name: line[0],
-      chunks: [...line[1]],
+      name: key,
+      chunks: cloneDeep(store.getSourceCodes[key]),
     });
   }
 }
 
-function onChangeName(lineIndex: number, event: Event) {
-  const { value } = event.target as HTMLInputElement;
+function onChangeName(lineIndex: number, event: HTMLInputElementEvent) {
+  const { value } = event.target;
   codes.value[lineIndex].name = value;
 }
 
@@ -72,9 +70,9 @@ function onChangeCharacter(
   lineIndex: number,
   chunkIndex: number,
   charIndex: number,
-  event: Event
+  event: HTMLInputElementEvent
 ) {
-  const { value } = event.target as HTMLInputElement;
+  const { value } = event.target!;
   const chunks = codes.value[lineIndex].chunks;
   chunks[chunkIndex][charIndex] = value;
 
@@ -121,10 +119,10 @@ onMounted(() => {
     >
       <input
         :value="line.name"
-        :ref="(el) => inputs.set(`${lineIndex}`, el)"
+        :ref="(el) => inputs.set(`${lineIndex}`, el as HTMLInputElement)"
         type="text"
         placeholder="Name"
-        @input="onChangeName(lineIndex, $event)"
+        @input="onChangeName(lineIndex, $event as HTMLInputElementEvent)"
       />
       <span
         v-for="(chunk, chunkIndex) in line.chunks"
@@ -137,12 +135,20 @@ onMounted(() => {
           :value="character"
           :ref="
             (el) => {
-              inputs.set(`${lineIndex}:${chunkIndex}:${charIndex}`, el);
+              inputs.set(`${lineIndex}:${chunkIndex}:${charIndex}`, el as HTMLInputElement);
             }
           "
           type="text"
           placeholder="."
-          @input="onChangeCharacter(lineIndex, chunkIndex, charIndex, $event)"
+          @focus="($event.target as HTMLInputElement).select()"
+          @input="
+            onChangeCharacter(
+              lineIndex,
+              chunkIndex,
+              charIndex,
+              $event as HTMLInputElementEvent
+            )
+          "
         />
       </span>
       <span
