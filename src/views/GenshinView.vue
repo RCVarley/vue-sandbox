@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, computed } from 'vue';
 import { useCodesStore } from '@/stores/codes';
 import cloneDeep from 'lodash.clonedeep';
 
@@ -17,6 +17,16 @@ const store = useCodesStore();
 const base = ref(3);
 const codes = ref(new Array<LineOfCode>());
 const inputs = ref(new Map<string, HTMLInputElement>());
+
+const validNumbers = computed(() => {
+  const result = [];
+
+  for (let i = 0; i <= base.value; i++) {
+    result.push(i);
+  }
+
+  return result;
+});
 
 function focusElement(key: string) {
   nextTick(() => {
@@ -104,8 +114,14 @@ onMounted(() => {
   <main class="stack">
     <div class="collection">
       <label for="base-counter">Base</label>
-      <input type="number" v-model="base" name="base" id="base-counter" />
+      <input
+        type="number"
+        v-model.number="base"
+        name="base"
+        id="base-counter"
+      />
     </div>
+    <div class="box">valid numbers: {{ validNumbers }}</div>
     <div class="collection">
       <button @click="reset">Reset</button>
       <button @click="clear">Clear</button>
