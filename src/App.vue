@@ -17,9 +17,10 @@ import HelloWorld from './components/HelloWorld.vue';
       <HelloWorld msg="You did it!" />
 
       <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-        <RouterLink to="/genshin">Genshin</RouterLink>
+        <RouterLink to="/" id="link-home">Home</RouterLink>
+        <RouterLink to="/about" id="link-about">About</RouterLink>
+        <RouterLink to="/genshin" id="link-genshin">Genshin</RouterLink>
+        <RouterLink to="/forms" id="link-forms">Forms</RouterLink>
       </nav>
     </div>
   </header>
